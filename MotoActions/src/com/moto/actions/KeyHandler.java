@@ -207,23 +207,6 @@ public class KeyHandler implements DeviceKeyHandler {
         }
     }
 
-    private boolean isInLockTaskMode() {
-        try {
-            return ActivityManagerNative.getDefault().isInLockTaskMode();
-        } catch (RemoteException e) {
-            // ignore
-        }
-        return false;
-    }
-
-    private void exitScreenPinningMode() {
-        try {
-            ActivityManagerNative.getDefault().stopSystemLockTaskMode();
-        } catch (RemoteException e) {
-            // ignore
-        }
-    }
-
     private static void switchToLastApp(Context context) {
         final ActivityManager am =
                 (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
@@ -526,6 +509,43 @@ public class KeyHandler implements DeviceKeyHandler {
         }
         return true;
     }
+    
+    public boolean canHandleKeyEvent(KeyEvent event) {
+        int scanCode = event.getScanCode();
+
+        if (DEBUG) {
+            Log.d(TAG, "DEBUG: action=" + event.getAction()
+                    + ", flags=" + event.getFlags()
+                    + ", keyCode=" + event.getKeyCode()
+                    + ", scanCode=" + event.getScanCode()
+                    + ", metaState=" + event.getMetaState()
+                    + ", repeatCount=" + event.getRepeatCount());
+        }
+
+        boolean isFPScanCode = ArrayUtils.contains(sSupportedFPGestures, scanCode);
+        boolean isScreenOffGesturesScanCode = ArrayUtils.contains(sSupportedScreenOffGestures, scanCode);
+        if (!isFPScanCode && !isScreenOffGesturesScanCode) {
+            return false;
+        }
+        
+        return true;
+    }    
+
+    public boolean isCameraLaunchEvent(KeyEvent event) {
+        return false;
+    }
+
+    public boolean isWakeEvent(KeyEvent event){
+        return false;
+    }
+
+    public boolean isDisabledKeyEvent(KeyEvent event) {
+        return false;
+    }
+
+    public Intent isActivityLaunchEvent(KeyEvent event) {
+        return null;
+    }
 
     private void processFPScancode(int scanCode) {
         int action = 0;
@@ -541,12 +561,7 @@ public class KeyHandler implements DeviceKeyHandler {
                 }
                 break;
             case FP_HOLD_SCANCODE:
-                if (isInLockTaskMode()){
-                    doHapticFeedbackFP(false);
-                    exitScreenPinningMode();
-                }else{
-                    action = str2int(FileUtils.readOneLine(getFPNodeBasedOnScreenState(FP_KEY_HOLD_NODE)));
-                }
+                action = str2int(FileUtils.readOneLine(getFPNodeBasedOnScreenState(FP_KEY_HOLD_NODE)));
                 break;
             case FP_RIGHT_SCANCODE:
                 action = str2int(FileUtils.readOneLine(getFPNodeBasedOnScreenState(FP_KEY_RIGHT_NODE)));
@@ -568,14 +583,11 @@ public class KeyHandler implements DeviceKeyHandler {
             isHapticFeedbackEnabledOnFP = false;
         }
         if (isHapticFeedbackEnabledOnFP){
-            if (!isInLockTaskMode() && (action == ACTION_CAMERA || action == ACTION_FLASHLIGHT)) {
+            if (action == ACTION_CAMERA || action == ACTION_FLASHLIGHT) {
                 vibrate(action == ACTION_CAMERA ? 500 : 250);
-            }else if (isInLockTaskMode() || action != ACTION_VOICE_ASSISTANT) {
+            }else if (action != ACTION_VOICE_ASSISTANT) {
                 doHapticFeedbackFP(false);
             }
-        }
-        if (isInLockTaskMode() && (action == ACTION_HOME || action == ACTION_RECENTS || action == ACTION_VOICE_ASSISTANT || action == ACTION_CAMERA || action == ACTION_LAST_APP)) {
-            return;
         }
         switch (action) {
             case ACTION_HOME:
